@@ -6,10 +6,12 @@
 
 - **OpenAI 兼容接口** - 完全兼容 OpenAI Chat Completions API（`/v1/chat/completions`）
 - **账号管理系统** - 支持多账号管理，启用/禁用控制，自动令牌刷新
+- **智能统计监控** - 自动统计成功/失败次数，错误超阈值自动禁用账号
 - **设备授权登录** - 通过 URL 快速登录并自动创建账号（5分钟超时）
 - **智能负载均衡** - 从启用的账号中随机选择，实现简单的负载分配
+- **HTTP 代理支持** - 可配置代理服务器，支持所有 HTTP 请求
 - **API Key 白名单** - 可选的访问控制，支持开发模式
-- **现代化前端** - 美观的 Web 控制台，支持账号管理和 Chat 测试
+- **现代化前端** - 美观的 Web 控制台，标签页布局，支持账号管理和 Chat 测试
 - **自动重试机制** - Token 过期时自动刷新并重试请求
 
 ## 🚀 快速开始
@@ -37,12 +39,16 @@ cp .env.example .env
 
 # 编辑 .env 文件
 # OPENAI_KEYS="key1,key2,key3"  # 可选，留空则为开发模式
+# MAX_ERROR_COUNT=100            # 错误次数阈值
+# HTTP_PROXY="http://127.0.0.1:7890"  # HTTP代理（可选）
 ```
 
 **配置说明：**
 - `OPENAI_KEYS` 为空或未设置：开发模式，不校验 Authorization
 - `OPENAI_KEYS` 设置后：仅白名单中的 key 可访问 API
 - API Key 仅用于访问控制，不映射到特定账号
+- `MAX_ERROR_COUNT`：账号连续失败次数超过此值将自动禁用（默认100）
+- `HTTP_PROXY`：HTTP代理地址，留空则不使用代理
 
 ### 3. 启动服务
 
@@ -235,6 +241,8 @@ print(response.choices[0].message.content)
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `OPENAI_KEYS` | API Key 白名单（逗号分隔） | 空（开发模式） |
+| `MAX_ERROR_COUNT` | 错误次数阈值，超过自动禁用账号 | 100 |
+| `HTTP_PROXY` | HTTP代理地址（如 http://127.0.0.1:7890） | 空（不使用代理） |
 
 ### 数据库结构
 
@@ -251,9 +259,20 @@ CREATE TABLE accounts (
     last_refresh_status TEXT,
     created_at TEXT,
     updated_at TEXT,
-    enabled INTEGER DEFAULT 1      -- 1=启用, 0=禁用
+    enabled INTEGER DEFAULT 1,     -- 1=启用, 0=禁用
+    error_count INTEGER DEFAULT 0, -- 连续错误次数
+    success_count INTEGER DEFAULT 0 -- 成功请求次数
 );
 ```
+
+### 账号统计与自动禁用
+
+系统会自动统计每个账号的请求结果：
+- **成功**：返回至少1个有效字符，`success_count+1`，`error_count`重置为0
+- **失败**：未返回有效字符或出错，`error_count+1`
+- **自动禁用**：当`error_count >= MAX_ERROR_COUNT`时，账号自动设置为`enabled=0`
+
+这确保了有问题的账号不会持续影响服务质量。
 
 ## 🐛 故障排查
 
