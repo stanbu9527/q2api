@@ -403,6 +403,8 @@ async def refresh_access_token_in_db(account_id: str) -> Dict[str, Any]:
                 (now, status, now, account_id),
             )
             await conn.commit()
+            # 记录刷新失败次数
+            await _update_stats(account_id, False)
             raise HTTPException(status_code=502, detail=f"Token refresh failed: {str(e)}")
         except Exception as e:
             # Ensure last_refresh_time is recorded even on unexpected errors
@@ -417,6 +419,8 @@ async def refresh_access_token_in_db(account_id: str) -> Dict[str, Any]:
                 (now, status, now, account_id),
             )
             await conn.commit()
+            # 记录刷新失败次数
+            await _update_stats(account_id, False)
             raise
 
         await conn.execute(
