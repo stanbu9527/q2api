@@ -1197,8 +1197,13 @@ if CONSOLE_ENABLED:
 
     # Frontend inline HTML removed; serving ./frontend/index.html instead (see route below)
 
-    @app.get("/", response_class=FileResponse)
-    def index():
+    @app.get("/", response_class=HTMLResponse)
+    async def index():
+        """
+        Console homepage - serves the management interface.
+        Password verification is handled by frontend JavaScript.
+        The page itself is not sensitive, but all API calls require password.
+        """
         path = BASE_DIR / "frontend" / "index.html"
         if not path.exists():
             raise HTTPException(status_code=404, detail="frontend/index.html not found")
