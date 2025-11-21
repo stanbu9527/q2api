@@ -468,8 +468,12 @@ async def _update_stats(account_id: str, success: bool) -> None:
 # Dependencies
 # ------------------------------------------------------------------------------
 
-async def require_account(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
-    bearer = _extract_bearer(authorization)
+async def require_account(
+    authorization: Optional[str] = Header(default=None),
+    x_api_key: Optional[str] = Header(default=None, alias="x-api-key")
+) -> Dict[str, Any]:
+    # Support both Authorization: Bearer and x-api-key headers
+    bearer = _extract_bearer(authorization) if authorization else x_api_key
     return await resolve_account_for_key(bearer)
 
 async def require_console_auth(x_console_password: Optional[str] = Header(default=None)):
