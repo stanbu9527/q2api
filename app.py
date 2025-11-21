@@ -29,11 +29,14 @@ try:
 except Exception:
     ENCODING = None
 
-def count_tokens(text: str) -> int:
+def count_tokens(text: str, apply_multiplier: bool = False) -> int:
     """Counts tokens with tiktoken."""
     if not text or not ENCODING:
         return 0
-    return len(ENCODING.encode(text))
+    token_count = len(ENCODING.encode(text))
+    if apply_multiplier:
+        token_count = int(token_count * TOKEN_COUNT_MULTIPLIER)
+    return token_count
 
 # ------------------------------------------------------------------------------
 # Bootstrap
@@ -243,6 +246,7 @@ def _parse_allowed_keys_env() -> List[str]:
 
 ALLOWED_API_KEYS: List[str] = _parse_allowed_keys_env()
 MAX_ERROR_COUNT: int = int(os.getenv("MAX_ERROR_COUNT", "100"))
+TOKEN_COUNT_MULTIPLIER: float = float(os.getenv("TOKEN_COUNT_MULTIPLIER", "1.0"))
 
 def _is_console_enabled() -> bool:
     """检查是否启用管理控制台"""
@@ -600,7 +604,7 @@ async def claude_messages(req: ClaudeRequest, account: Dict[str, Any] = Depends(
                     if isinstance(item, dict) and item.get("type") == "text":
                         text_to_count += item.get("text", "")
 
-        input_tokens = count_tokens(text_to_count)
+        input_tokens = count_tokens(text_to_count, apply_multiplier=True)
         handler = ClaudeStreamHandler(model=req.model, input_tokens=input_tokens)
 
         async def event_generator():
@@ -700,6 +704,41 @@ async def claude_messages(req: ClaudeRequest, account: Dict[str, Any] = Depends(
             pass
         await _update_stats(account["id"], False)
         raise
+
+@app.post("/v1/messages/count_tokens")
+async def count_tokens_endpoint(req: ClaudeRequest):
+    """
+    Count tokens in a message without sending it.
+    Compatible with Claude API's /v1/messages/count_tokens endpoint.
+    Uses tiktoken for local token counting.
+    """
+    text_to_count = ""
+    
+    # Count system prompt tokens
+    if req.system:
+        if isinstance(req.system, str):
+            text_to_count += req.system
+        elif isinstance(req.system, list):
+            for item in req.system:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_to_count += item.get("text", "")
+    
+    # Count message tokens
+    for msg in req.messages:
+        if isinstance(msg.content, str):
+            text_to_count += msg.content
+        elif isinstance(msg.content, list):
+            for item in msg.content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_to_count += item.get("text", "")
+    
+    # Count tool definition tokens if present
+    if req.tools:
+        text_to_count += json.dumps([tool.model_dump() if hasattr(tool, 'model_dump') else tool for tool in req.tools], ensure_ascii=False)
+    
+    input_tokens = count_tokens(text_to_count, apply_multiplier=True)
+    
+    return {"input_tokens": input_tokens}
 
 @app.post("/v1/chat/completions")
 async def chat_completions(req: ChatCompletionRequest, account: Dict[str, Any] = Depends(require_account)):

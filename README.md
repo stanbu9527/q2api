@@ -100,6 +100,10 @@ DATABASE_URL=""
 # 留空则为开发模式，不校验 Authorization
 OPENAI_KEYS=""
 
+# Token 计数倍率（影响 /v1/messages/count_tokens 和 /v1/messages 的输入 token 统计）
+# 默认值为 1.0，可根据实际需要调整（如设置为 1.5 表示返回 1.5 倍的 token 数）
+TOKEN_COUNT_MULTIPLIER="1.0"
+
 # 出错次数阈值，超过此值自动禁用账号
 MAX_ERROR_COUNT=100
 
@@ -379,6 +383,7 @@ v2/
 |------|------|--------|------|
 | `DATABASE_URL` | 数据库连接URL | 空（使用SQLite） | `"postgres://user:pass@host:5432/db"` |
 | `OPENAI_KEYS` | API Key 白名单（逗号分隔） | 空（开发模式） | `"key1,key2"` |
+| `TOKEN_COUNT_MULTIPLIER` | Token 计数倍率 | `1.0` | `"1.5"` |
 | `MAX_ERROR_COUNT` | 错误次数阈值 | 100 | `50` |
 | `HTTP_PROXY` | HTTP代理地址 | 空 | `"http://127.0.0.1:7890"` |
 | `ENABLE_CONSOLE` | 管理控制台开关 | `"true"` | `"false"` |
@@ -426,6 +431,7 @@ CREATE TABLE accounts (
 
 ### Claude 兼容
 - `POST /v1/messages` - Messages API（支持流式、工具调用、多模态）
+- `POST /v1/messages/count_tokens` - Token 计数接口（预先统计消息的 token 数量）
 
 ### 其他
 - `GET /` - Web 控制台（需启用 ENABLE_CONSOLE）
