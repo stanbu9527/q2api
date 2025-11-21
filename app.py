@@ -1198,7 +1198,7 @@ if CONSOLE_ENABLED:
     # Frontend inline HTML removed; serving ./frontend/index.html instead (see route below)
 
     @app.get("/", response_class=FileResponse)
-    def index(_auth: bool = Depends(require_console_auth)):
+    def index():
         path = BASE_DIR / "frontend" / "index.html"
         if not path.exists():
             raise HTTPException(status_code=404, detail="frontend/index.html not found")
