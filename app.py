@@ -253,7 +253,13 @@ def _is_console_enabled() -> bool:
     console_env = os.getenv("ENABLE_CONSOLE", "true").strip().lower()
     return console_env not in ("false", "0", "no", "disabled")
 
+def _get_console_password() -> Optional[str]:
+    """获取控制台访问密码"""
+    pwd = os.getenv("CONSOLE_PASSWORD", "").strip()
+    return pwd if pwd else None
+
 CONSOLE_ENABLED: bool = _is_console_enabled()
+CONSOLE_PASSWORD: Optional[str] = _get_console_password()
 
 def _extract_bearer(token_header: Optional[str]) -> Optional[str]:
     if not token_header:
@@ -465,6 +471,19 @@ async def _update_stats(account_id: str, success: bool) -> None:
 async def require_account(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     bearer = _extract_bearer(authorization)
     return await resolve_account_for_key(bearer)
+
+async def require_console_auth(x_console_password: Optional[str] = Header(default=None)):
+    """验证控制台访问权限"""
+    if not CONSOLE_ENABLED:
+        raise HTTPException(status_code=404, detail="Console is disabled")
+    
+    if CONSOLE_PASSWORD:
+        if not x_console_password or x_console_password != CONSOLE_PASSWORD:
+            raise HTTPException(
+                status_code=401, 
+                detail="Console access denied. Please provide valid X-Console-Password header."
+            )
+    return True
 
 # ------------------------------------------------------------------------------
 # OpenAI-compatible Chat endpoint
@@ -918,7 +937,7 @@ async def _create_account_from_tokens(
 # 管理控制台相关端点 - 仅在启用时注册
 if CONSOLE_ENABLED:
     @app.post("/v2/auth/start")
-    async def auth_start(body: AuthStartBody):
+    async def auth_start(body: AuthStartBody, _auth: bool = Depends(require_console_auth)):
         """
         Start device authorization and return verification URL for user login.
         Session lifetime capped at 5 minutes on claim.
@@ -955,7 +974,7 @@ if CONSOLE_ENABLED:
         }
 
     @app.get("/v2/auth/status/{auth_id}")
-    async def auth_status(auth_id: str):
+    async def auth_status(auth_id: str, _auth: bool = Depends(require_console_auth)):
         sess = AUTH_SESSIONS.get(auth_id)
         if not sess:
             raise HTTPException(status_code=404, detail="Auth session not found")
@@ -970,7 +989,7 @@ if CONSOLE_ENABLED:
         }
 
     @app.post("/v2/auth/claim/{auth_id}")
-    async def auth_claim(auth_id: str):
+    async def auth_claim(auth_id: str, _auth: bool = Depends(require_console_auth)):
         """
         Block up to 5 minutes to exchange the device code for tokens after user completed login.
         On success, creates an enabled account and returns it.
@@ -1025,7 +1044,7 @@ if CONSOLE_ENABLED:
     # ------------------------------------------------------------------------------
 
     @app.post("/v2/accounts")
-    async def create_account(body: AccountCreate):
+    async def create_account(body: AccountCreate, _auth: bool = Depends(require_console_auth)):
         now = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
         acc_id = str(uuid.uuid4())
         other_str = json.dumps(body.other, ensure_ascii=False) if body.other is not None else None
@@ -1074,7 +1093,7 @@ if CONSOLE_ENABLED:
                 traceback.print_exc()
 
     @app.post("/v2/accounts/feed")
-    async def create_accounts_feed(request: BatchAccountCreate):
+    async def create_accounts_feed(request: BatchAccountCreate, _auth: bool = Depends(require_console_auth)):
         """
         统一的投喂接口，接收账号列表，立即存入并后台异步验证。
         """
@@ -1120,23 +1139,23 @@ if CONSOLE_ENABLED:
         }
 
     @app.get("/v2/accounts")
-    async def list_accounts():
+    async def list_accounts(_auth: bool = Depends(require_console_auth)):
         rows = await _db.fetchall("SELECT * FROM accounts ORDER BY created_at DESC")
         return [_row_to_dict(r) for r in rows]
 
     @app.get("/v2/accounts/{account_id}")
-    async def get_account_detail(account_id: str):
+    async def get_account_detail(account_id: str, _auth: bool = Depends(require_console_auth)):
         return await get_account(account_id)
 
     @app.delete("/v2/accounts/{account_id}")
-    async def delete_account(account_id: str):
+    async def delete_account(account_id: str, _auth: bool = Depends(require_console_auth)):
         rowcount = await _db.execute("DELETE FROM accounts WHERE id=?", (account_id,))
         if rowcount == 0:
             raise HTTPException(status_code=404, detail="Account not found")
         return {"deleted": account_id}
 
     @app.patch("/v2/accounts/{account_id}")
-    async def update_account(account_id: str, body: AccountUpdate):
+    async def update_account(account_id: str, body: AccountUpdate, _auth: bool = Depends(require_console_auth)):
         now = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
         fields = []
         values: List[Any] = []
@@ -1169,7 +1188,7 @@ if CONSOLE_ENABLED:
         return _row_to_dict(row)
 
     @app.post("/v2/accounts/{account_id}/refresh")
-    async def manual_refresh(account_id: str):
+    async def manual_refresh(account_id: str, _auth: bool = Depends(require_console_auth)):
         return await refresh_access_token_in_db(account_id)
 
     # ------------------------------------------------------------------------------
@@ -1179,7 +1198,7 @@ if CONSOLE_ENABLED:
     # Frontend inline HTML removed; serving ./frontend/index.html instead (see route below)
 
     @app.get("/", response_class=FileResponse)
-    def index():
+    def index(_auth: bool = Depends(require_console_auth)):
         path = BASE_DIR / "frontend" / "index.html"
         if not path.exists():
             raise HTTPException(status_code=404, detail="frontend/index.html not found")

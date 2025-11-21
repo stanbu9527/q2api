@@ -115,6 +115,11 @@ HTTP_PROXY=""
 # 设置为 "false" 或 "0" 可禁用管理控制台和相关API端点
 ENABLE_CONSOLE="true"
 
+# 管理控制台访问密码（强烈推荐设置）
+# 留空则不需要密码（仅适用于本地开发环境）
+# 生产环境必须设置强密码保护控制台访问
+CONSOLE_PASSWORD=""
+
 # 主服务端口（默认 8000）
 PORT=8000
 ```
@@ -125,6 +130,21 @@ PORT=8000
 - API Key 仅用于访问控制，不映射到特定账号
 - 账号选择策略：从所有启用账号中随机选择
 - `ENABLE_CONSOLE` 设为 `false` 或 `0`：禁用 Web 管理控制台和账号管理 API
+- `CONSOLE_PASSWORD` **生产环境必须设置**：保护控制台访问，防止未授权操作
+
+**🔐 控制台安全配置（重要）：**
+
+生产环境部署时，强烈建议设置控制台访问密码：
+
+```bash
+# 使用 PowerShell 生成强密码
+pwsh setup_console_password.ps1
+
+# 或手动设置
+CONSOLE_PASSWORD="your_strong_random_password_here"
+```
+
+详细安全配置请参考：[CONSOLE_SECURITY.md](CONSOLE_SECURITY.md)
 
 #### 3. 启动服务
 
@@ -387,6 +407,7 @@ v2/
 | `MAX_ERROR_COUNT` | 错误次数阈值 | 100 | `50` |
 | `HTTP_PROXY` | HTTP代理地址 | 空 | `"http://127.0.0.1:7890"` |
 | `ENABLE_CONSOLE` | 管理控制台开关 | `"true"` | `"false"` |
+| `CONSOLE_PASSWORD` | 控制台访问密码 | 空（不推荐） | `"your_strong_password"` |
 | `PORT` | 服务端口 | 8000 | `8080` |
 
 ### 数据库结构
@@ -489,11 +510,15 @@ server {
 
 ## 🔒 安全建议
 
-1. **生产环境必须配置 `OPENAI_KEYS`**
-2. **使用 HTTPS 反向代理（Nginx + Let's Encrypt）**
-3. **定期备份数据库**（SQLite: `data.sqlite3`，或 PG/MySQL 数据库）
-4. **限制数据库访问权限**
-5. **配置防火墙规则，限制访问来源**
+1. **生产环境必须配置 `CONSOLE_PASSWORD`** - 保护管理控制台访问
+2. **生产环境必须配置 `OPENAI_KEYS`** - 保护 API 访问
+3. **使用 HTTPS 反向代理（Nginx + Let's Encrypt）**
+4. **定期备份数据库**（SQLite: `data.sqlite3`，或 PG/MySQL 数据库）
+5. **限制数据库访问权限**
+6. **配置防火墙规则，限制访问来源**
+7. **定期轮换密码和 API Keys**
+
+详细安全配置指南：[CONSOLE_SECURITY.md](CONSOLE_SECURITY.md)
 
 ## 📄 许可证
 
