@@ -17,5 +17,5 @@ COPY frontend ./frontend
 # Expose port
 EXPOSE 8000
 
-# Start command
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Start command - use PORT env var if set, otherwise default to 8000
+CMD sh -c "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4"
