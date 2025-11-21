@@ -1210,7 +1210,12 @@ if CONSOLE_ENABLED:
 
 @app.get("/healthz")
 async def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "version": "v2.1.0-password-protection",
+        "console_password_enabled": bool(CONSOLE_PASSWORD),
+        "console_enabled": CONSOLE_ENABLED
+    }
 
 # ------------------------------------------------------------------------------
 # Startup / Shutdown Events
