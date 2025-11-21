@@ -357,6 +357,26 @@ def row_to_dict(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if row is None:
         return None
     d = dict(row)
+    
+    # PostgreSQL returns lowercase field names, map them to camelCase
+    field_mapping = {
+        'clientid': 'clientId',
+        'clientsecret': 'clientSecret',
+        'refreshtoken': 'refreshToken',
+        'accesstoken': 'accessToken',
+        'created_at': 'created_at',
+        'updated_at': 'updated_at',
+        'last_refresh_time': 'last_refresh_time',
+        'last_refresh_status': 'last_refresh_status',
+        'error_count': 'error_count',
+        'success_count': 'success_count',
+    }
+    
+    # Apply field name mapping
+    for old_key, new_key in field_mapping.items():
+        if old_key in d and old_key != new_key:
+            d[new_key] = d.pop(old_key)
+    
     if d.get("other"):
         try:
             d["other"] = json.loads(d["other"])
